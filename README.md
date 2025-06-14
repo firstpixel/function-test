@@ -156,15 +156,15 @@ function_test/
 
 ### Prompt and System Prompt Example
 
-![Prompt Example](https://github.com/firstpixel/function-test/images/prompts.png)
+![Prompt Example](images/prompts.png)
 
 ### Expected Result Example
 
-![Expected Results](https://github.com/firstpixel/function-test/images/expected_results.png)
+![Expected Results](images/expected_results.png)
 
 ### Results Grid (10 Rounds)
 
-![Results Grid](https://github.com/firstpixel/function-test/images/results.png)
+![Results Grid](images/results.png)
 
 ---
 
