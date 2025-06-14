@@ -2,7 +2,7 @@ Absolutely! Based on the full scope of our chat and the detailed functionality y
 
 ---
 
-# 📊 LLM Function Analysis Grid (`function_test`)
+# 📊 LLM Function Analysis Grid (`function-test`)
 
 **A Streamlit-based interactive tool to evaluate how accurately multiple LLMs call structured functions for specific tasks.**
 
