@@ -1,0 +1,11 @@
+# Core
+streamlit>=1.35.0
+pandas>=2.0.0
+numpy>=1.24.0
+matplotlib>=3.7.0
+
+# Ollama Python client (ensure you install the official or custom wrapper you use)
+ollama>=0.1.6
+
+# Interactive Data Grid
+streamlit-aggrid>=0.3.4.post3
