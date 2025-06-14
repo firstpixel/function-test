@@ -152,9 +152,25 @@ function_test/
 
 ---
 
+## 🖼️ Screenshots
+
+### Prompt and System Prompt Example
+
+![Prompt Example](https://github.com/firstpixel/function-test/images/prompts.png)
+
+### Expected Result Example
+
+![Expected Results](https://github.com/firstpixel/function-test/images/expected_results.png)
+
+### Results Grid (10 Rounds)
+
+![Results Grid](https://github.com/firstpixel/function-test/images/results.png)
+
+---
+
 ## 🗂️ Repo
 
-**Project:** `function_test`
+**Project:** `function-test`
 **Status:** Prototype — extend and adapt freely!
 **Author:** Gil Beyruth
 

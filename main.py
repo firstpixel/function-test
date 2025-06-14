@@ -1,8 +1,8 @@
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode, GridUpdateMode
 import streamlit as st
-import olloma
 import time
 import pandas as pd
+import ollama  # Correct import for the Ollama Python client
 
 # Initialize session state for function sequence and LLM analysis results
 if "functions_to_call" not in st.session_state:
@@ -13,12 +13,24 @@ if "functions_to_call" not in st.session_state:
 if "results" not in st.session_state:
     # Get available models from ollama list command output
     import subprocess
-    olloma_list = subprocess.check_output(["ollama", "list"]).decode("utf-8")
+    ollama_list = subprocess.check_output(["ollama", "list"]).decode("utf-8")
     available_models = []
-    for line in olloma_list.splitlines():
+    for line in ollama_list.splitlines():
         if line.strip() and not line.startswith("NAME"):
             model_name = line.split()[0]
-            if model_name not in ["nomic-embed-text:latest", "hf.co/OuteAI/OuteTTS-0.2-500M-GGUF:Q8_0"]:
+            if model_name not in [
+                "nomic-embed-text:latest",
+                "hf.co/OuteAI/OuteTTS-0.2-500M-GGUF:Q8_0",
+                "llava:latest",
+                "mistral:7b",
+                "deepseek-r1:14b",
+                "phi4:latest",
+                "deepseek-coder-v2:16b",
+                "qwen2.5-coder:14b",
+                "deepseek-coder:6.7b",
+                "minicpm-v:latest",
+                "qwen2.5:latest"
+            ]:
                 available_models.append(model_name)
     st.session_state["results"] = pd.DataFrame([
         {
@@ -61,28 +73,39 @@ Ensure tasks involving calculations, file operations, code testing, git commands
 """)
 with col2:
     system_prompt = st.text_area("System Prompt", height=150, 
-                                 value="""You are an intelligent assistant designed to analyze tasks and return an accurate list of functions corresponding to each task. Your job is to evaluate each task individually and assign one function to each task from the predefined list below. Ensure that you only return a comma-separated list of functions, strictly following these rules:
+                                 value="""You are a highly precise task classifier.  
+Your job is to read a list of tasks provided by the user and, for each task, choose **exactly one function** from the predefined list below that best describes the required action.
 
-Analyze each task carefully to determine its purpose and required action.
-Assign exactly one function per task from the list below based on its description:
-func_calculate: Use this for tasks involving any kind of mathematical calculation.
-func_weather: Use this for tasks requesting weather reports or temperature information for a location.
-func_git: Use this for tasks involving git operations such as commit, push, pull, or branch creation.
-func_develop: Use this for tasks that involve writing, reviewing, or modifying code.
-func_test: Use this for tasks related to testing code or software.
-func_save: Use this for tasks that involve saving files or data.
-func_open: Use this for tasks that involve opening files or data.
-func_document: Use this for tasks that involve creating or preparing documentation.
-Return only the list of functions, separated by commas, with no additional text, explanations, or formatting.
-Example: If the tasks are:
+You MUST:
+- Analyze each task one by one.
+- Match each task to the most appropriate function **from the list below** — no exceptions.
+- Return **only the list of function names**, in the same order as the tasks, separated by commas, with no other text or formatting.
 
-Add 45 and 55.
-Save the file report.txt.
-Test the new feature implementation.
-Commit the code to the repository.
-You should return: func_calculate,func_save,func_test,func_git
+**Available Functions:**
+- func_calculate: Use if the task involves any numerical calculation or arithmetic.
+- func_weather: Use if the task requests weather information or temperature for any location.
+- func_git: Use if the task involves git commands like commit, push, pull, branch creation, or version control.
+- func_develop: Use if the task involves writing, editing, or reviewing any code.
+- func_test: Use if the task involves testing code or verifying functionality.
+- func_save: Use if the task requires saving a file or data.
+- func_open: Use if the task requires opening a file.
+- func_document: Use if the task requests creating or updating documentation.
 
-Remember: Each task must correspond to one function, and the output must only contain the comma-separated function names.
+**Output Requirements:**
+- Your final answer must contain ONLY the function names in the correct order, separated by commas.
+- DO NOT include explanations, code, markdown, bullet points, or any extra words.
+
+**Example:**
+Input Tasks:  
+1. Add 45 and 55  
+2. Save the file report.txt  
+3. Test the new feature implementation  
+4. Commit the code to the repository
+
+Expected Output:  
+func_calculate,func_save,func_test,func_git
+
+Remember: The output must be a plain comma-separated list — no brackets, quotes, or additional notes.
 """)
 
 # Function Selection Section
@@ -109,6 +132,7 @@ if st.button("Run Analysis"):
     results_df = st.session_state["results"]
     for idx, row in results_df.iterrows():
         llm_name = row["LLM Name"]
+        print(f"[DEBUG] Starting analysis for model: {llm_name}")
         start_time = time.time()
         success = True
         last_response = ""
@@ -119,27 +143,32 @@ if st.button("Run Analysis"):
                 {"role": "user", "content": prompt}
             ]
             # Call the LLM
-            response = olloma.chat(
+            response = ollama.chat(
                 model=llm_name,
                 stream=False,
                 messages=messages
             )
             end_time = time.time()
-            
+            print(f"[DEBUG] Finished analysis for model: {llm_name}")
             # Extract response and evaluate
             last_response = response["message"]["content"].strip()
             execution_time = end_time - start_time
 
             # Normalize the LLM's response
             normalized_response = last_response.strip()
+            # Remove <think>...</think> tags and their content
+            import re
+            normalized_response = re.sub(r'<think>.*?</think>', '', normalized_response, flags=re.DOTALL).strip()
             if normalized_response.startswith("[") and normalized_response.endswith("]"):
                 normalized_response = normalized_response[1:-1]
 
-            response_functions = set(func.strip() for func in normalized_response.split(","))
-            selected_functions = set(st.session_state["functions_to_call"])
-            success = selected_functions.issubset(response_functions)
+            response_functions = [func.strip() for func in normalized_response.split(",") if func.strip()]
+            selected_functions = st.session_state["functions_to_call"]
+            # Validate both content and order
+            success = response_functions == selected_functions
 
         except Exception as e:
+            print(f"[DEBUG] Error during analysis for model: {llm_name}: {e}")
             success = False
             execution_time = time.time() - start_time
             last_response = f"Error: {str(e)}"
@@ -153,11 +182,22 @@ if st.button("Run Analysis"):
         success_percentage = (success_count / run_count) * 100
         st.session_state["results"].loc[idx, [
             "Time to Execute", "Total Time", "Last Execution",
-            "Last Assistant Response", "Success/Fail", "Run Count", "Success Percentage"
+            "Success/Fail", "Run Count", "Success Percentage", "Last Assistant Response"
         ]] = [
             f"{execution_time:.2f} seconds", f"{total_time:.2f} seconds", time.ctime(),
-            last_response, "Success" if success else "Fail", run_count, success_percentage
+            "Success" if success else "Fail", run_count, success_percentage, last_response
         ]
+
+# Reorder columns so 'Last Assistant Response' is after 'Success Percentage'
+results_df = st.session_state["results"]
+if list(results_df.columns) != [
+    "LLM Name", "Time to Execute", "Total Time", "Last Execution",
+    "Success/Fail", "Run Count", "Success Percentage", "Last Assistant Response"
+]:
+    st.session_state["results"] = results_df[[
+        "LLM Name", "Time to Execute", "Total Time", "Last Execution",
+        "Success/Fail", "Run Count", "Success Percentage", "Last Assistant Response"
+    ]]
 
 # JavaScript function for gradient coloring
 gradient_js = JsCode("""
@@ -179,25 +219,19 @@ function(params) {
 # Configure AgGrid with JavaScript-based gradient
 gb = GridOptionsBuilder.from_dataframe(st.session_state["results"])
 gb.configure_column("Success Percentage", cellStyle=gradient_js)
+gb.configure_column("Last Assistant Response", width=300, resizable=True)
 gb.configure_default_column(editable=False, sortable=True)
 
 # Render AgGrid with gradient coloring
 AgGrid(
-    st.session_state["results"],
+    st.session_state["results"].sort_values([
+        "Time to Execute", "Success Percentage"],
+        ascending=[True, False],
+        key=lambda col: col.str.replace(' seconds', '').astype(float) if col.name == "Time to Execute" else col
+    ),
     gridOptions=gb.build(),
     enable_enterprise_modules=False,
     allow_unsafe_jscode=True,
     height=400,
-    theme="streamlit",
+    theme="streamlit"
 )
-
-
-
-
-# Footer
-st.write("### Instructions")
-st.write("""
-1. Enter a prompt and system prompt.
-2. Add the functions that the LLM must call.
-3. Run the analysis to evaluate each LLM against the defined inputs and functions.
-""")
